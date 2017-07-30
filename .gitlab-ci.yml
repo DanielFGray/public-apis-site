@@ -1,0 +1,19 @@
+image: node:6
+
+cache:
+  paths:
+    - node_modules/
+
+before_script:
+  - yarn
+
+pages:
+  stage: deploy
+  script:
+    - yarn build --noprogress
+    - yarn surge -d public-apis.surge.sh
+  artifacts:
+    paths:
+      - public
+  only:
+    - master
