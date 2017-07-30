@@ -1,7 +1,8 @@
 // @flow
 import React from 'react'
 import { render } from 'react-dom'
-import { withState, lifecycle } from 'recompose'
+import { provideState, injectState } from 'freactal'
+import { lifecycle } from 'recompose'
 import {
   compose,
   contains,
@@ -17,6 +18,7 @@ import {
   List,
   Loader,
   Segment,
+
 } from 'semantic-ui-react'
 
 const branch = (fn, a, b = null) => (fn ? a : b)
@@ -31,56 +33,78 @@ const process = data => pipe(
   flatten,
 )(data)
 
-const App = compose(
-  withState('data', 'dataChange', {}),
-  withState('category', 'categoryChange', []),
-  withState('https', 'httpsChange', 'Any'),
-  withState('auth', 'authChange', 'Any'),
-  lifecycle({
-    componentDidMount() {
+const wrapWithPending = (pendingKey, cb) => (effects, ...a) =>
+  effects.setFlag(pendingKey, true)
+    .then(() => cb(effects, ...a))
+    .then(value => effects.setFlag(pendingKey, false).then(() => value))
+
+const Provider = provideState({
+  initialState: () => ({
+    data: {},
+    dataPending: true,
+    category: [],
+    https: 'Any',
+    auth: 'Any',
+    sort: 'Name',
+  }),
+  effects: {
+    setFlag: (effects, key, value) => state => ({ ...state, [key]: value }),
+    getData: wrapWithPending('dataPending', () =>
       fetch('https://raw.githubusercontent.com/toddmotto/public-apis/master/json/entries.min.json')
         .then(x => x.json())
-        .then(this.props.dataChange)
+        .then(data => state => ({ ...state, data }))),
+    categoryChange: (_, category) => state => ({ ...state, category }),
+    httpsChange: (_, https) => state => ({ ...state, https }),
+    authChange: (_, auth) => state => ({ ...state, auth }),
+    sortChange: (_, sort) => state => ({ ...state, sort }),
+  },
+})
+
+const Main = compose(
+  lifecycle({
+    componentDidMount() {
+      this.props.effects.getData()
     },
   }),
-)(props => {
-  let { data } = props
+)(({ state, effects }) => {
+  let { data } = state
   data = process(data)
-  if (props.category.length) {
-    data = data.filter(e => contains(e.Category, props.category))
+  if (state.category.length) {
+    data = data.filter(e => contains(e.Category, state.category))
   }
-  if (props.https !== 'Any') {
-    if (props.https === 'HTTPS enabled') {
+  if (state.https !== 'Any') {
+    if (state.https === 'HTTPS enabled') {
       data = data.filter(e => e.HTTPS !== 'No')
     } else {
       data = data.filter(e => e.HTTPS === 'No')
     }
   }
-  if (props.auth !== 'Any') {
-    if (props.auth === 'Auth required') {
+  if (state.auth !== 'Any') {
+    if (state.auth === 'Auth required') {
       data = data.filter(e => e.Auth !== 'No')
     } else {
       data = data.filter(e => e.Auth === 'No')
     }
   }
-  data = sortBy(prop('API'), data)
+  data = sortBy(prop(state.sort), data)
   return (
     <div style={{ margin: '10px' }}>
       <Segment secondary>
         <Dropdown
-          onChange={(e, d) => props.categoryChange(d.value)}
+          onChange={(e, d) => effects.categoryChange(d.value)}
           placeholder={'Categories'}
           search
           selection
           multiple
           options={
-            Object.keys(props.data)
+            Object.keys(state.data)
               .map(e => ({ key: e, value: e, text: e }))
           }
+          value={state.category}
         />
         <Dropdown
-          onChange={(e, d) => props.httpsChange(d.value)}
-          placeholder={'HTTPS'}
+          onChange={(e, d) => effects.httpsChange(d.value)}
+          labeled
           selection
           defaultValue={0}
           options={
@@ -89,8 +113,7 @@ const App = compose(
           }
         />
         <Dropdown
-          onChange={(e, d) => props.authChange(d.value)}
-          placeholder={'Auth'}
+          onChange={(e, d) => effects.authChange(d.value)}
           selection
           defaultValue={0}
           options={
@@ -99,10 +122,10 @@ const App = compose(
           }
         />
       </Segment>
-      {branch(Object.keys(props.data).length > 0 && data.length > 0,
+      {branch(state.dataPending === false && data.length > 0,
         <div>{data.length} results shown</div>)}
       {branch(
-        Object.keys(props.data).length === 0,
+        state.dataPending,
         <Loader active />,
         <Segment>
           <List divided>
@@ -110,8 +133,7 @@ const App = compose(
               'No matches found',
               data.map(e => <Item key={e.Link} {...e} />))}
           </List>
-        </Segment>,
-      )}
+        </Segment>)}
       <div style={{ textAlign: 'center' }}>
         Made by <a href="https://github.com/DanielFGray/public-apis-site">DanielFGray</a>. Data from <a href="https://github.com/toddmotto/public-apis">Todd Motto</a>
       </div>
@@ -121,8 +143,12 @@ const App = compose(
 
 const Item = ({ API, Description, Link }) => (
   <List.Item>
-    <a href={Link}>{API}</a> - {Description}
+    <div>
+      <a href={Link}>{API}</a> - {Description}
+    </div>
   </List.Item>
 )
+
+const App = Provider(injectState(Main))
 
 render(<App />, document.getElementById('main'))

@@ -10,6 +10,7 @@
     "lint": "concurrently 'flow --quiet --color=always' 'eslint --ext=.js,.jsx src' 'stylelint src/**/*.{css,sss}' --prefix '{name}:' --names 'flow,eslint,stylelint' -c 'gray.reset' || true"
   },
   "dependencies": {
+    "freactal": "^1.1.1",
     "normalize.css": "^7.0.0",
     "ramda": "^0.24.1",
     "react": "next",
