@@ -113,7 +113,7 @@ const App = compose(
         </Segment>,
       )}
       <div style={{ textAlign: 'center' }}>
-        Made by <a href="https://github.com/DanielFGray">DanielFGray</a>. Data from <a href="https://github.com/toddmotto/public-apis">Todd Motto</a>
+        Made by <a href="https://github.com/DanielFGray/public-apis-site">DanielFGray</a>. Data from <a href="https://github.com/toddmotto/public-apis">Todd Motto</a>
       </div>
     </div>
   )
