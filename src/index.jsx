@@ -6,32 +6,29 @@ import { lifecycle } from 'recompose'
 import {
   compose,
   contains,
-  keys,
   map,
-  pipe,
+  pipe as $,
+  pluck,
   prop,
-  flatten,
+  propEq,
   sortBy,
+  uniq,
 } from 'ramda'
 import {
   Dropdown,
   List,
   Loader,
   Segment,
-
 } from 'semantic-ui-react'
 
-const branch = (fn, a, b = null) => (fn ? a : b)
+const branch = (fn, a, b = null) =>
+  (fn ? a : b)
 
-const process = data => pipe(
-  keys,
-  map(key => data[key].map(e => ({
-    ...e,
-    Category: key,
-    Link: e.Link.replace(/.*\(([^)]+)\)/, '$1'),
-  }))),
-  flatten,
-)(data)
+const categoryList = $(
+  pluck('Section'),
+  uniq,
+  map(e => ({ key: e, value: e, text: e })),
+)
 
 const wrapWithPending = (pendingKey, cb) => (effects, ...a) =>
   effects.setFlag(pendingKey, true)
@@ -40,18 +37,19 @@ const wrapWithPending = (pendingKey, cb) => (effects, ...a) =>
 
 const Provider = provideState({
   initialState: () => ({
-    data: {},
+    data: [],
     dataPending: true,
     category: [],
     https: 'Any',
     auth: 'Any',
-    sort: 'Name',
+    sort: 'API',
   }),
   effects: {
     setFlag: (effects, key, value) => state => ({ ...state, [key]: value }),
     getData: wrapWithPending('dataPending', () =>
       fetch('https://raw.githubusercontent.com/toddmotto/public-apis/master/json/entries.min.json')
         .then(x => x.json())
+        .then(prop('entries'))
         .then(data => state => ({ ...state, data }))),
     categoryChange: (_, category) => state => ({ ...state, category }),
     httpsChange: (_, https) => state => ({ ...state, https }),
@@ -67,26 +65,26 @@ const Main = compose(
     },
   }),
 )(({ state, effects }) => {
+  // const data = apFilters(state, state.data)
   let { data } = state
-  data = process(data)
   if (state.category.length) {
-    data = data.filter(e => contains(e.Category, state.category))
+    data = data.filter(e => contains(e.Section, state.category))
   }
   if (state.https !== 'Any') {
     if (state.https === 'HTTPS enabled') {
-      data = data.filter(e => e.HTTPS !== 'No')
+      data = data.filter(propEq('HTTPS', true))
     } else {
-      data = data.filter(e => e.HTTPS === 'No')
+      data = data.filter(propEq('HTTPS', false))
     }
   }
   if (state.auth !== 'Any') {
     if (state.auth === 'Auth required') {
-      data = data.filter(e => e.Auth !== 'No')
+      data = data.filter(e => e.Auth !== null)
     } else {
-      data = data.filter(e => e.Auth === 'No')
+      data = data.filter(propEq('Auth', null))
     }
   }
-  data = sortBy(prop(state.sort), data)
+  data = sortBy(prop('API'), data)
   return (
     <div style={{ margin: '10px' }}>
       <Segment secondary>
@@ -96,10 +94,7 @@ const Main = compose(
           search
           selection
           multiple
-          options={
-            Object.keys(state.data)
-              .map(e => ({ key: e, value: e, text: e }))
-          }
+          options={categoryList(state.data)}
           value={state.category}
         />
         <Dropdown
@@ -131,11 +126,13 @@ const Main = compose(
           <List divided>
             {branch(data.length === 0,
               'No matches found',
-              data.map(e => <Item key={e.Link} {...e} />))}
+              data.map(e => <Item key={e.Link} {...e} categoryChange={effects.categoryChange} />))}
           </List>
         </Segment>)}
       <div style={{ textAlign: 'center' }}>
-        Made by <a href="https://github.com/DanielFGray/public-apis-site">DanielFGray</a>. Data from <a href="https://github.com/toddmotto/public-apis">Todd Motto</a>
+        Made by <a href="https://github.com/DanielFGray/public-apis-site">DanielFGray</a>.
+        {' '}
+        Data from <a href="https://github.com/toddmotto/public-apis">Todd Motto</a>.
       </div>
     </div>
   )
@@ -144,7 +141,7 @@ const Main = compose(
 const Item = ({ API, Description, Link }) => (
   <List.Item>
     <div>
-      <a href={Link}>{API}</a> - {Description}
+      <a href={Link}>{API}</a> - <span dangerouslySetInnerHTML={{ __html: Description }} />
     </div>
   </List.Item>
 )

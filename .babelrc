@@ -13,7 +13,10 @@
     },
     "production": {
       "plugins": [
-        "ramda"
+        ["lodash", { "id": [
+          "recompose",
+          "ramda"
+        ]}]
       ]
     }
   }

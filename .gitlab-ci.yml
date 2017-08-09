@@ -1,4 +1,4 @@
-image: node:6
+image: node:8
 
 cache:
   paths:
@@ -10,8 +10,7 @@ before_script:
 pages:
   stage: deploy
   script:
-    - yarn build --noprogress
-    - yarn surge -d public-apis.surge.sh
+    - yarn --noprogress build
   artifacts:
     paths:
       - public
